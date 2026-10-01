@@ -10,7 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.ToneGenerator
 import android.net.ConnectivityManager
 import android.net.TrafficStats
@@ -22,11 +24,19 @@ import android.os.Process
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.telephony.TelephonyManager
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Calendar
@@ -376,39 +386,86 @@ class MainActivity : Activity() {
         return null
     }
 
-    private fun beep() {
+    // Daftar nada beep yang bisa dipilih (ToneGenerator) + label Indonesianya
+    private val toneOptions = listOf(
+        ToneGenerator.TONE_CDMA_HIGH_L to "Tiiit tinggi panjang",
+        ToneGenerator.TONE_CDMA_PIP to "Pip pendek",
+        ToneGenerator.TONE_PROP_BEEP to "Beep",
+        ToneGenerator.TONE_PROP_PROMPT to "Prompt",
+        ToneGenerator.TONE_CDMA_ONE_MIN_BEEP to "Beep satu menit",
+        ToneGenerator.TONE_SUP_DIAL to "Nada dial",
+        ToneGenerator.TONE_SUP_BUSY to "Nada sibuk",
+        ToneGenerator.TONE_DTMF_5 to "Nada DTMF"
+    )
+
+    private fun prefs() = getSharedPreferences("mpdclock", Context.MODE_PRIVATE)
+
+    private fun beep(type: Int) {
         try {
-            // TONE_CDMA_HIGH_L: nada tinggi panjang "tiiiit", 650ms, volume maksimal
-            toneGen?.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 650)
+            toneGen?.startTone(type, 650)
         } catch (_: Exception) {
         }
     }
 
-    /** Tepat HH:00: beep sejumlah jam (format 12 jam), lalu bicara "Sekarang pukul N". */
+    /** Tepat HH:00: beep sejumlah jam (format 12 jam) dengan nada pilihan, lalu pengumuman jam. */
     private fun hourlyChime(hour12: Int) {
+        val toneHour = prefs().getInt("tone_hour", ToneGenerator.TONE_CDMA_HIGH_L)
         var delay = 0L
         repeat(hour12.coerceIn(1, 12)) {
-            handler.postDelayed({ beep() }, delay)
+            val d = delay
+            handler.postDelayed({ beep(toneHour) }, d)
             delay += 950L
         }
-        handler.postDelayed({
-            try {
-                // Paksa lewat stream ALARM agar tetap bunyi walau media dimute
-                val params = Bundle().apply {
-                    putString(
-                        TextToSpeech.Engine.KEY_PARAM_STREAM,
-                        AudioManager.STREAM_ALARM.toString()
-                    )
-                }
-                tts?.speak(
-                    "Sekarang pukul $hour12",
-                    TextToSpeech.QUEUE_FLUSH,
-                    params,
-                    "hourly_chime"
+        handler.postDelayed({ announceHour(hour12) }, delay + 300L)
+    }
+
+    /** Pengumuman jam sesuai mode: file suara bawaan (default), TTS sistem, atau mati. */
+    private fun announceHour(hour12: Int) {
+        when (prefs().getString("voice_mode", "file")) {
+            "tts" -> speakTts("Sekarang pukul $hour12")
+            "off" -> { /* diam */ }
+            else -> playVoiceFile(hour12)
+        }
+    }
+
+    /**
+     * Putar file suara bawaan res/raw/pukul_<1-12>.mp3 via stream ALARM.
+     * Tidak tergantung TTS sistem, jadi tetap bunyi di custom ROM yang
+     * TTS-nya bermasalah.
+     */
+    private fun playVoiceFile(hour12: Int) {
+        try {
+            val resId = resources.getIdentifier("pukul_$hour12", "raw", packageName)
+            if (resId == 0) return
+            val afd = resources.openRawResourceFd(resId) ?: return
+            val mp = MediaPlayer()
+            mp.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
+            mp.prepare()
+            mp.setOnCompletionListener { it.release() }
+            mp.start()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun speakTts(text: String) {
+        try {
+            // Paksa lewat stream ALARM agar tetap bunyi walau media dimute
+            val params = Bundle().apply {
+                putString(
+                    TextToSpeech.Engine.KEY_PARAM_STREAM,
+                    AudioManager.STREAM_ALARM.toString()
                 )
-            } catch (_: Exception) {
             }
-        }, delay + 300L)
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "hourly_chime")
+        } catch (_: Exception) {
+        }
     }
 
     private val tick = object : Runnable {
@@ -442,7 +499,7 @@ class MainActivity : Activity() {
                             if (h12 == 0) h12 = 12
                             hourlyChime(h12)
                         }
-                        30 -> beep()
+                        30 -> beep(prefs().getInt("tone_half", ToneGenerator.TONE_CDMA_HIGH_L))
                     }
                 }
             }
@@ -514,6 +571,20 @@ class MainActivity : Activity() {
 
         // Tekan lama jam -> buka info aplikasi di Pengaturan
         clockBox.setOnLongClickListener { openAppSettings(); true }
+        // Ketuk dua kali jam -> buka popup pengaturan suara
+        val tapDetector = GestureDetector(
+            this,
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    openSoundSettings()
+                    return true
+                }
+            }
+        )
+        clockBox.setOnTouchListener { _, event ->
+            tapDetector.onTouchEvent(event)
+            false // jangan konsumsi agar long-press tetap berfungsi
+        }
         // Tekan lama suhu -> tampilkan daftar thermal zones (diagnostik)
         tempText.setOnLongClickListener { showThermalZones(); true }
 
@@ -687,6 +758,123 @@ class MainActivity : Activity() {
             }
         }
         return if (s.level in 0..4) (s.level * 6) / 4 else -1
+    }
+
+    /**
+     * Popup pengaturan suara (dibuka dengan ketuk dua kali pada jam):
+     * - nada beep lonceng tiap jam (:00), dengan tombol dengar contoh
+     * - nada beep tiap setengah jam (:30), dengan tombol dengar contoh
+     * - mode pengumuman jam: file suara bawaan / TTS sistem / mati
+     */
+    private fun openSoundSettings() {
+        val p = prefs()
+        val toneLabels = toneOptions.map { it.second }
+        val toneValues = toneOptions.map { it.first }
+
+        fun sectionLabel(text: String, topPad: Int): TextView =
+            TextView(this).apply {
+                this.text = text
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(0, topPad, 0, 8)
+            }
+
+        fun toneRow(selected: Int): Pair<LinearLayout, Spinner> {
+            val spinner = Spinner(this).apply {
+                adapter = ArrayAdapter(
+                    this@MainActivity,
+                    android.R.layout.simple_spinner_item,
+                    toneLabels
+                ).apply {
+                    setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                }
+                setSelection(toneValues.indexOf(selected).takeIf { it >= 0 } ?: 0)
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(
+                    spinner,
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                )
+                addView(Button(this@MainActivity).apply {
+                    text = "Dengar"
+                    setOnClickListener {
+                        beep(toneValues[spinner.selectedItemPosition])
+                    }
+                })
+            }
+            return row to spinner
+        }
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 16)
+        }
+
+        layout.addView(sectionLabel("Nada lonceng tiap jam (:00)", 0))
+        val (rowHour, spHour) =
+            toneRow(p.getInt("tone_hour", ToneGenerator.TONE_CDMA_HIGH_L))
+        layout.addView(rowHour)
+
+        layout.addView(sectionLabel("Nada tiap setengah jam (:30)", 32))
+        val (rowHalf, spHalf) =
+            toneRow(p.getInt("tone_half", ToneGenerator.TONE_CDMA_HIGH_L))
+        layout.addView(rowHalf)
+
+        layout.addView(sectionLabel("Pengumuman jam", 32))
+        val rbFile = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "File suara bawaan (disarankan)"
+        }
+        val rbTts = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "TTS sistem"
+        }
+        val rbOff = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "Mati"
+        }
+        val rg = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            addView(rbFile)
+            addView(rbTts)
+            addView(rbOff)
+            check(
+                when (p.getString("voice_mode", "file")) {
+                    "tts" -> rbTts.id
+                    "off" -> rbOff.id
+                    else -> rbFile.id
+                }
+            )
+        }
+        layout.addView(rg)
+        layout.addView(TextView(this).apply {
+            text = "File suara bawaan tidak tergantung TTS sistem, " +
+                "jadi tetap bunyi di custom ROM yang TTS-nya bermasalah."
+            setPadding(0, 8, 0, 0)
+        })
+
+        val scroll = ScrollView(this).apply { addView(layout) }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pengaturan suara")
+            .setView(scroll)
+            .setPositiveButton("Simpan") { _, _ ->
+                p.edit()
+                    .putInt("tone_hour", toneValues[spHour.selectedItemPosition])
+                    .putInt("tone_half", toneValues[spHalf.selectedItemPosition])
+                    .putString(
+                        "voice_mode",
+                        when (rg.checkedRadioButtonId) {
+                            rbTts.id -> "tts"
+                            rbOff.id -> "off"
+                            else -> "file"
+                        }
+                    )
+                    .apply()
+                Toast.makeText(this, "Pengaturan suara disimpan", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 
     /**

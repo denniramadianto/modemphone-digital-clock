@@ -258,6 +258,14 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Garis pemisah antara bar atas dan jam -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="2dp"
+            android:background="#D0D0D0" />
+
         <!-- Tengah: jam besar -->
         <LinearLayout
             android:id="@+id/clockBox"

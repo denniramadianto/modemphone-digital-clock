@@ -89,7 +89,7 @@ class SegmentDisplayView @JvmOverloads constructor(
         super.onDraw(canvas)
         val u = unit
         if (u <= 0f || charX.isEmpty()) return
-        val t = u * 0.17f // ketebalan segmen
+        val t = u * 0.23f // ketebalan segmen (ditebalkan agar jelas dari jauh)
 
         for (i in displayText.indices) {
             val c = displayText[i]
