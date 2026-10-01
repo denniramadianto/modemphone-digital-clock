@@ -260,6 +260,7 @@
 
         <!-- Tengah: jam besar -->
         <LinearLayout
+            android:id="@+id/clockBox"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="4dp"

@@ -14,6 +14,7 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.net.ConnectivityManager
 import android.net.TrafficStats
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -26,6 +27,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import java.util.Calendar
@@ -37,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var minView: SegmentDisplayView
     private lateinit var secView: SegmentDisplayView
     private lateinit var colonView: TextView
+    private lateinit var clockBox: LinearLayout
     private lateinit var amText: TextView
     private lateinit var pmText: TextView
     private lateinit var ledDown: View
@@ -484,6 +487,7 @@ class MainActivity : Activity() {
         minView = findViewById(R.id.minView)
         secView = findViewById(R.id.secView)
         colonView = findViewById(R.id.colonView)
+        clockBox = findViewById(R.id.clockBox)
         amText = findViewById(R.id.amText)
         pmText = findViewById(R.id.pmText)
         ledDown = findViewById(R.id.ledDown)
@@ -508,6 +512,11 @@ class MainActivity : Activity() {
 
         initChime()
         promptUsageAccessOnce()
+
+        // Tekan lama jam -> buka info aplikasi di Pengaturan
+        clockBox.setOnLongClickListener { openAppSettings(); true }
+        // Tekan lama suhu -> tampilkan daftar thermal zones (diagnostik)
+        tempText.setOnLongClickListener { showThermalZones(); true }
 
         signalMonitor = SignalMonitor(this, ::onSignalUpdate)
         updateNetBadge()
@@ -612,12 +621,14 @@ class MainActivity : Activity() {
     }
 
     private fun onSignalUpdate(signals: List<SignalMonitor.SimSignal>) {
-        val s1 = signals.getOrNull(0)
-        val s2 = signals.getOrNull(1)
+        // Cocokkan berdasarkan slot SIM, bukan urutan list: kalau yang aktif
+        // cuma slot 2, datanya tidak boleh tampil di label SIM 1.
+        val s1 = signals.firstOrNull { it.label == "SIM 1" }
+        val s2 = signals.firstOrNull { it.label == "SIM 2" }
 
         if (s1 != null) {
             sim1Label.text = "${s1.label} • ${s1.carrier}"
-            sim1Bars.level = s1.level
+            sim1Bars.level = signalBars6(s1)
             sim1Dbm.text = formatDbm(s1.dbm)
             sim1Band.text = formatBand(s1)
         } else {
@@ -629,7 +640,7 @@ class MainActivity : Activity() {
 
         if (s2 != null) {
             sim2Label.text = "${s2.label} • ${s2.carrier}"
-            sim2Bars.level = s2.level
+            sim2Bars.level = signalBars6(s2)
             sim2Dbm.text = formatDbm(s2.dbm)
             sim2Band.text = formatBand(s2)
         } else {
@@ -659,6 +670,73 @@ class MainActivity : Activity() {
 
     private fun formatDbm(dbm: Int): String =
         if (dbm == Int.MIN_VALUE) "-" else "$dbm dBm"
+
+    /**
+     * Bar sinyal 0..6 dipetakan dari dBm (lebih granular dari level 0..4 bawaan).
+     * -1 = belum diketahui. Fallback: skala level bawaan bila dBm tak terbaca.
+     */
+    private fun signalBars6(s: SignalMonitor.SimSignal): Int {
+        if (s.dbm != Int.MIN_VALUE) {
+            return when {
+                s.dbm >= -75 -> 6
+                s.dbm >= -85 -> 5
+                s.dbm >= -95 -> 4
+                s.dbm >= -105 -> 3
+                s.dbm >= -115 -> 2
+                s.dbm >= -125 -> 1
+                else -> 0
+            }
+        }
+        return if (s.level in 0..4) (s.level * 6) / 4 else -1
+    }
+
+    /** Tekan lama jam: buka halaman info aplikasi di Pengaturan. */
+    private fun openAppSettings() {
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", packageName, null)
+                )
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Tekan lama suhu: tampilkan semua thermal zones + suhunya (diagnostik). */
+    private fun showThermalZones() {
+        Thread {
+            val sb = StringBuilder()
+            try {
+                val zones = java.io.File("/sys/class/thermal")
+                    .listFiles { f -> f.name.startsWith("thermal_zone") }
+                    ?.sortedBy { it.name } ?: emptyList()
+                for (zone in zones) {
+                    val type = readThermalFile(java.io.File(zone, "type"))?.trim() ?: "?"
+                    val raw = readThermalFile(java.io.File(zone, "temp"))
+                        ?.trim()?.toLongOrNull()
+                    val temp = if (raw != null && raw > 0 && raw <= 200_000) {
+                        String.format(localeId, "%.1f°C", raw / 1000.0)
+                    } else {
+                        "?"
+                    }
+                    sb.append("${zone.name} [$type]: $temp\n")
+                }
+            } catch (_: Exception) {
+            }
+            val text = sb.toString().trim().ifBlank { "tidak terbaca" }
+            handler.post {
+                try {
+                    AlertDialog.Builder(this)
+                        .setTitle("Thermal zones")
+                        .setMessage(text)
+                        .setPositiveButton("Tutup", null)
+                        .show()
+                } catch (_: Exception) {
+                }
+            }
+        }.start()
+    }
 
     private fun formatBand(s: SignalMonitor.SimSignal): String {
         if (s.band == "-") return "Band -"

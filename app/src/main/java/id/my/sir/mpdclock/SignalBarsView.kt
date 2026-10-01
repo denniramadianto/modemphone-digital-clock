@@ -8,7 +8,7 @@ import android.util.AttributeSet
 import android.view.View
 
 /**
- * Indikator bar sinyal 4 tingkat (level 0..4).
+ * Indikator bar sinyal 6 tingkat (level 0..6, dipetakan dari dBm).
  * level = -1 berarti belum diketahui.
  */
 class SignalBarsView @JvmOverloads constructor(
@@ -17,7 +17,7 @@ class SignalBarsView @JvmOverloads constructor(
 
     var level: Int = -1
         set(value) {
-            val v = value.coerceIn(-1, 4)
+            val v = value.coerceIn(-1, 6)
             if (field != v) {
                 field = v
                 invalidate()
@@ -31,7 +31,7 @@ class SignalBarsView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val n = 4
+        val n = 6
         val gap = width * 0.10f
         val bw = (width - gap * (n - 1)) / n
         if (bw <= 0f) return
