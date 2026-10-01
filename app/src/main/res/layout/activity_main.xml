@@ -14,27 +14,45 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Bar atas: trafik (kiri) | tanggal (tengah) | rotasi (kanan) -->
+        <!-- Bar atas: 4G kecil + trafik (lebar TETAP, tidak bergeser) | tanggal (lebar tetap) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- Panel trafik: LED di atas, angka trafik di bawahnya -->
-            <LinearLayout
+            <!-- Badge 4G kecil di sudut kiri atas, sebelum LED -->
+            <TextView
+                android:id="@+id/netBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_gravity="top"
+                android:layout_marginTop="2dp"
+                android:background="@drawable/badge_outline"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="2dp"
+                android:text="4G"
+                android:textColor="@android:color/black"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <!-- Panel trafik: LEBAR TETAP 180dp. Angka di bawah tiap LED juga
+                 lebar tetap + rata tengah, jadi perubahan angka tidak
+                 menggeser badge 4G maupun kotak tanggal. -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
                 android:orientation="vertical">
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="180dp"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <LinearLayout
-                        android:layout_width="wrap_content"
+                        android:layout_width="88dp"
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
@@ -48,9 +66,11 @@
 
                         <TextView
                             android:id="@+id/dlSpeed"
-                            android:layout_width="wrap_content"
+                            android:layout_width="88dp"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:maxLines="1"
                             android:text="↓ -"
                             android:textColor="@android:color/black"
                             android:textSize="12sp"
@@ -58,9 +78,8 @@
                     </LinearLayout>
 
                     <LinearLayout
-                        android:layout_width="wrap_content"
+                        android:layout_width="88dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -73,34 +92,25 @@
 
                         <TextView
                             android:id="@+id/ulSpeed"
-                            android:layout_width="wrap_content"
+                            android:layout_width="88dp"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
+                            android:gravity="center"
+                            android:maxLines="1"
                             android:text="↑ -"
                             android:textColor="@android:color/black"
                             android:textSize="12sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/netBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:background="@drawable/badge_outline"
-                        android:paddingHorizontal="9dp"
-                        android:paddingVertical="3dp"
-                        android:text="4G"
-                        android:textColor="@android:color/black"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
                     android:id="@+id/dataUsageText"
-                    android:layout_width="wrap_content"
+                    android:layout_width="180dp"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
+                    android:gravity="center_horizontal"
+                    android:maxLines="1"
                     android:text="Data -"
                     android:textColor="@android:color/black"
                     android:textSize="12sp" />
@@ -119,12 +129,12 @@
                 android:orientation="horizontal">
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="84dp"
                     android:layout_height="wrap_content"
                     android:layout_margin="4dp"
                     android:background="@drawable/box_outline"
                     android:gravity="center_horizontal"
-                    android:minWidth="88dp"
+
                     android:orientation="vertical"
                     android:padding="7dp">
 
@@ -142,12 +152,12 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="84dp"
                     android:layout_height="wrap_content"
                     android:layout_margin="4dp"
                     android:background="@drawable/box_outline"
                     android:gravity="center_horizontal"
-                    android:minWidth="88dp"
+
                     android:orientation="vertical"
                     android:padding="7dp">
 
@@ -165,12 +175,12 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="84dp"
                     android:layout_height="wrap_content"
                     android:layout_margin="4dp"
                     android:background="@drawable/box_outline"
                     android:gravity="center_horizontal"
-                    android:minWidth="88dp"
+
                     android:orientation="vertical"
                     android:padding="7dp">
 
@@ -188,12 +198,12 @@
                 </LinearLayout>
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="84dp"
                     android:layout_height="wrap_content"
                     android:layout_margin="4dp"
                     android:background="@drawable/box_outline"
                     android:gravity="center_horizontal"
-                    android:minWidth="88dp"
+
                     android:orientation="vertical"
                     android:padding="7dp">
 

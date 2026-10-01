@@ -24,6 +24,7 @@ echo "[1/6] aapt2 compile (resources)..."
 echo "[2/6] aapt2 link..."
 "$BT/aapt2" link -o "$BUILD/app.apk" -I "$ANDROID_JAR" \
     --manifest "$SRC/AndroidManifest.xml" \
+    --min-sdk-version 26 --target-sdk-version 35 \
     --java "$BUILD/gen" \
     "$BUILD/res.zip"
 
