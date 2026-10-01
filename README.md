@@ -1,59 +1,173 @@
-# Jam Digital 7Seg
+# ModemPhone Digital Clock
 
-Aplikasi jam digital Android (mode **landscape**) dengan tampilan seven-segment,
-konsepnya seperti `shg2.apk` ditambah fitur pemantauan sinyal & trafik data.
+Jam digital Android mode **landscape** dengan digit seven-segment besar —
+dirancang sebagai **jam meja / jam modem**: dipasang di HP yang dijadikan
+modem 24 jam (atau sekadar jam dinding digital), lengkap dengan pemantauan
+sinyal, trafik data, dan suhu CPU secara realtime.
 
-## Fitur
+Tampilan: background putih, digit hitam, fullscreen imersif, layar selalu menyala.
 
-- **Jam digital seven-segment** lengkap dengan **detik** (`HH:MM:SS`), digambar
-  langsung via custom view (tanpa file font eksternal) — presisi & tajam di semua ukuran layar.
-- **Tanggal & hari format Indonesia** di bagian atas, contoh: `Kamis, 01 Oktober 2026`.
-- **Sinyal SIM 1 & SIM 2 realtime**: bar sinyal 4 tingkat + nilai dBm + nama operator,
-  dibaca langsung dari `TelephonyManager` per-SIM (bukan dummy).
-- **Logo 4G/5G + kecepatan paket data**: badge generasi jaringan aktual + kecepatan
-  **download (↓)** dan **upload (↑)** yang dihitung dari `TrafficStats` tiap 1 detik —
-  sesuai trafik asli di perangkat.
-- Background putih, tulisan seven-segment hitam. Layar selalu menyala & fullscreen
-  (immersive) — cocok untuk jam meja.
+---
 
-## Izin yang dibutuhkan
+## ✨ Fitur
 
-- `READ_PHONE_STATE` — untuk membaca kekuatan sinyal & info jaringan tiap SIM.
-  Aplikasi akan meminta izin ini saat pertama dibuka. Tanpa izin, info sinyal
-  tidak dapat ditampilkan (jam & trafik tetap jalan).
+### 🕰️ Jam & tanggal
+- **Jam seven-segment besar** format 12 jam (`HH:MM:SS`) + indikator **AM/PM** —
+  digit digambar langsung via custom view (`SegmentDisplayView`), tajam di semua
+  ukuran layar tanpa file font eksternal.
+- **Titik dua (:) berdetak** setiap detik; detik ditampilkan lebih kecil agar
+  jam & menit tetap dominan.
+- **Tanggal format Indonesia** di bar bawah, rata tengah: nama hari (font biasa,
+  bold) + kotak tanggal/bulan/tahun berfont DSEG seven-segment.
 
-## Cara build (Android Studio)
+### 📶 Sinyal SIM 1 & SIM 2 (realtime, bukan dummy)
+- **6 bar sinyal** dipetakan dari dBm aktual (≥ -75 dBm = 6 bar penuh).
+- Nilai **dBm**, **nama operator**, dan **band sel utama** (mis. `LTE B40`, `NR n78`).
+- Dibaca per slot SIM via `TelephonyManager` (`TelephonyCallback` di API 31+,
+  `PhoneStateListener` di bawahnya) — pemetaan berdasarkan **nomor slot**, jadi
+  tetap benar walau yang aktif hanya slot SIM 2.
+- **Badge generasi jaringan** (4G/5G) mengikuti SIM yang terdeteksi jaringannya.
 
-1. Buka Android Studio → **Open** → pilih folder `jam-digital-7seg`.
-2. Tunggu Gradle sync selesai (butuh internet saat pertama kali).
-3. **Run** ke HP (aktifkan USB debugging) atau **Build → Build APK(s)**.
+### 📊 Trafik & pemakaian data
+- Kecepatan **download (↓)** dan **upload (↑)** dihitung tiap 1 detik dari
+  `TrafficStats`.
+- **LED hijau/kuning** menyala saat ada aktivitas download/upload.
+- **Data X.XX GB**: total pemakaian data seluler **bulanan** (tanggal 1 s.d.
+  sekarang, tidak reset saat HP restart) via `NetworkStatsManager`.
+  Butuh izin *Akses penggunaan* (diminta sekali saat pertama dibuka);
+  bila belum diberikan, fallback ke `TrafficStats`.
 
-APK debug akan ada di `app/build/outputs/apk/debug/app-debug.apk`.
+### 🌡️ Suhu CPU
+- Dibaca dari `/sys/class/thermal` tiap 5 detik di thread latar — dibuat untuk
+  HP **tanpa baterai** (bypass/step-down + root Magisk) yang suhunya tidak bisa
+  dibaca dari sensor baterai.
+- Mengambil nilai tertinggi dari zona bertipe `cpu`; tampil `--°C` bila gagal.
+- **Tekan-lama kotak suhu** → dialog diagnostik berisi daftar semua thermal
+  zone + suhunya masing-masing.
 
-## Cara install APK di HP
+### 🔔 Lonceng tiap jam
+- Tepat `HH:00` → bunyi *beep* sejumlah jam (format 12 jam), lalu suara
+  **"Sekarang pukul N"** (TTS Bahasa Indonesia).
+- Tepat `HH:30` → satu bunyi *beep*.
+- Nada: `TONE_CDMA_HIGH_L` 650 ms, interval 950 ms, volume penuh via
+  stream **ALARM** (tetap bunyi walau media di-mute). Saat aplikasi dibuka,
+  ketersediaan data suara TTS dicek otomatis.
 
-1. Salin file `.apk` ke HP.
-2. Buka file-nya → izinkan **"Install aplikasi yang tidak dikenal"** bila diminta.
-3. Buka aplikasi → setujui izin telepon → putar HP ke landscape (aplikasi otomatis landscape).
+### 🏠 Mode launcher & jalan pintas
+- Terdaftar sebagai **aplikasi Home/Launcher** — tiap HP dinyalakan langsung
+  masuk ke jam.
+- **Tekan-lama jam** → membuka **daftar semua aplikasi** di Pengaturan
+  (jalan pintas membuka aplikasi lain, karena tidak ada laci aplikasi).
 
-## Catatan teknis
+---
 
-- Sinyal: `TelephonyManager.createForSubscriptionId()` + `TelephonyCallback`
-  (API 31+) / `PhoneStateListener` (API 26–30) per slot SIM.
-- Trafik: `TrafficStats.getMobileRxBytes()/getMobileTxBytes()` per detik
-  (fallback ke total bila perangkat tidak mendukung pemisahan trafik seluler).
-- `minSdk 26` (Android 8.0), `targetSdk 34`.
+## 🖥️ Tata letak layar
 
-## Build sendiri
+```
+┌──────────────────────────────────────────────────────────────┐
+│ [4G] ● ●   ↓ 1.2 MB/s   ↑ 340 KB/s        SIM 1 • Operator   │
+│         Data 3.42 GB         [6 bar] -87 dBm   LTE B40  24°C │
+│                                                              │
+│                                                              │
+│                    0 9 : 4 1 : 0 7   AM PM                    │
+│                                                              │
+│                                                              │
+│              Senin   01   Oktober   2026                      │
+└──────────────────────────────────────────────────────────────┘
+```
 
-Build dilakukan tanpa Gradle via `build-apk.sh` (pipeline aapt2 → kotlinc → d8 →
-zipalign → apksigner). Signing memakai `release.keystore` yang **tidak ikut**
-repo ini — buat keystore sendiri bila ingin build APK signed:
+- **Kiri atas**: badge jaringan, LED trafik, kecepatan ↓/↑, Data bulanan.
+- **Kanan atas**: sinyal SIM1/SIM2 + suhu CPU.
+- **Tengah**: jam besar. **Bawah**: hari/tanggal/bulan/tahun.
+
+---
+
+## 🔄 Alur kerja aplikasi
+
+Setiap komponen berjalan sebagai *loop* independen di `MainActivity`:
+
+| Komponen | Pemicu | Yang dilakukan |
+|---|---|---|
+| `tick` jam | Tiap 1 detik (`Handler`) | Update digit jam, kedipkan titik dua, cek jadwal lonceng |
+| `SignalMonitor` | Event perubahan sinyal per SIM | Baca level → petakan ke 6 bar dari dBm, update label/dBm/band/operator |
+| `TrafficMonitor` | Tiap 1 detik | Selisih `TrafficStats` → kecepatan ↓/↑, nyalakan LED bila ada trafik |
+| Data bulanan | Tiap 60 detik (cache) | `NetworkStatsManager.querySummaryForDevice` dari tanggal 1 |
+| Suhu CPU | Tiap 5 detik (thread latar) | Baca `/sys/class/thermal`, ambil maks zona `cpu` |
+| Band sel | Tiap perubahan sinyal + tiap 15 detik | Baca `CellInfo` → band utama (`getBands()` API 30+ / EARFCN di bawahnya) |
+| Lonceng | Dari `tick`, saat `HH:00` / `HH:30` | `ToneGenerator` + `TextToSpeech` (stream ALARM) |
+
+**Urutan saat aplikasi dibuka:** `setContentView` → sembunyikan system bar
+→ minta izin telepon & lokasi → cek data suara TTS → tawarkan *Akses
+penggunaan* (sekali saja) → jalankan semua monitor di atas.
+
+---
+
+## 🔐 Izin yang dibutuhkan
+
+| Izin | Untuk apa |
+|---|---|
+| `READ_PHONE_STATE` | Membaca kekuatan sinyal & info jaringan tiap SIM |
+| `ACCESS_FINE_LOCATION` | Syarat Android untuk membaca info sel (band) |
+| `PACKAGE_USAGE_STATS` | Membaca pemakaian data bulanan (*Akses penggunaan*, via Pengaturan) |
+
+Tanpa izin telepon/lokasi, info sinyal tampil `-` — jam & trafik tetap jalan.
+
+---
+
+## 🛠️ Cara build
+
+Build **tanpa Gradle** memakai skrip `build-apk.sh`
+(pipeline: `aapt2` → `kotlinc` → `d8` → `zipalign` → `apksigner`):
+
+```bash
+./build-apk.sh ~/workspace/mpdclock-vX.Y.apk
+```
+
+- `minSdk 26` (Android 8.0), `targetSdk 35`.
+- Naikkan `versionCode`/`versionName` di `app/src/main/AndroidManifest.xml`
+  setiap merilis versi baru.
+- Signing memakai `release.keystore` yang **tidak ikut repo ini** — buat
+  keystore sendiri bila ingin build APK signed:
 
 ```bash
 keytool -genkeypair -keystore release.keystore -alias appkey \
   -keyalg RSA -keysize 2048 -validity 10000
 ```
+
+## 📲 Cara install APK di HP
+
+1. Salin file `.apk` ke HP.
+2. Buka file-nya → izinkan **"Install aplikasi yang tidak dikenal"** bila diminta.
+3. Buka aplikasi → setujui izin yang diminta → aktifkan *Akses penggunaan*
+   bila ingin angka Data bulanan akurat.
+4. (Opsional) Jadikan aplikasi Home/Launcher default agar tiap HP dinyalakan
+   langsung masuk ke jam.
+
+## 🧩 Struktur proyek
+
+```
+app/src/main/
+├── AndroidManifest.xml                 # minSdk 26, targetSdk 35, kategori HOME
+├── java/id/my/sir/mpdclock/
+│   ├── MainActivity.kt                 # orkestrasi semua loop & UI
+│   ├── SignalMonitor.kt                # sinyal + band per SIM
+│   ├── TrafficMonitor.kt               # kecepatan ↓/↑ + LED
+│   ├── SegmentDisplayView.kt           # digit seven-segment (custom draw)
+│   └── SignalBarsView.kt               # 6 bar sinyal (custom draw)
+└── res/layout/activity_main.xml        # layout: bar atas, jam, bar tanggal
+```
+
+## ⚠️ Keterbatasan yang diketahui
+
+- **Band sel**: Android tidak mengekspos *carrier aggregation* ke aplikasi
+  biasa, jadi yang tampil hanya **band utama** (mis. `B40`, bukan `B40+B1`).
+- **Skala 6 bar** adalah pemetaan dari dBm (perkiraan yang masuk akal),
+  bukan skala resmi Android yang hanya 0–4.
+- **Data bulanan** butuh *Akses penggunaan*; tanpa itu angka fallback
+  (`TrafficStats`) akan reset tiap HP restart.
+- **Suhu CPU** butuh thermal zone yang bisa dibaca; bila tidak, tampil `--°C`.
+
+---
 
 ## Lisensi
 
