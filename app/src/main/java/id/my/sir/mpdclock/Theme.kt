@@ -103,5 +103,17 @@ val THEMES = listOf(
         boxFill = Color.parseColor("#0A0A0A"),
         boxStroke = Color.parseColor("#00E676"),
         divider = Color.parseColor("#333333")
+    ),
+    ClockTheme(
+        name = "Malam Klasik",
+        layout = R.layout.activity_main,
+        bg = Color.BLACK,
+        digitOn = Color.WHITE,
+        digitOff = Color.parseColor("#1A1A1A"),
+        text = Color.WHITE,
+        subText = Color.parseColor("#555555"),
+        boxFill = Color.parseColor("#0A0A0A"),
+        boxStroke = Color.WHITE,
+        divider = Color.parseColor("#333333")
     )
 )

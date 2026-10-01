@@ -52,7 +52,7 @@ Tampilan: background putih, digit hitam, fullscreen imersif, layar selalu menyal
 - Nada `:00` dan `:30` bisa dipilih sendiri (8 nada) + tombol **Dengar** contoh.
 - **Ketuk 2× jam** → popup **Pengaturan** (suara + kelola versi aplikasi).
 
-### 🎨 Tema (7 pilihan, swipe kiri/kanan pada jam)
+### 🎨 Tema (8 pilihan, swipe kiri/kanan pada jam)
 | Tema | Layout | Warna |
 |---|---|---|
 | Siang Klasik | Klasik | Putih, digit hitam |
@@ -62,6 +62,7 @@ Tampilan: background putih, digit hitam, fullscreen imersif, layar selalu menyal
 | Samudra | Samping (info di kanan) | Navy, digit cyan |
 | Kertas Vintage | Klasik | Krem, digit cokelat |
 | Smartwatch | Watch face + complications | Hitam, digit putih |
+| Malam Klasik | Klasik | Full hitam, digit & tulisan putih |
 
 - Semua fitur tetap sama di semua tema — hanya tampilan yang berubah.
 - Pilihan tema tersimpan walau HP restart.
