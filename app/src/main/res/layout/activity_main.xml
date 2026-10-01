@@ -12,7 +12,7 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="24dp">
 
         <!-- Bar atas: 4G kecil + trafik (lebar TETAP, tidak bergeser) | tanggal (lebar tetap) -->
         <LinearLayout
@@ -250,6 +250,8 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
                 android:gravity="center"
                 android:orientation="vertical">
 
@@ -285,7 +287,7 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginStart="10dp"
-                android:layout_weight="0.45"
+                android:layout_weight="0.3"
                 android:gravity="center_horizontal"
                 android:orientation="vertical">
 
