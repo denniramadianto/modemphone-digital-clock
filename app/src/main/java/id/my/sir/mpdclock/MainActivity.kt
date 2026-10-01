@@ -32,6 +32,7 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -70,6 +71,12 @@ class MainActivity : Activity() {
     private lateinit var dlSpeed: TextView
     private lateinit var ulSpeed: TextView
     private lateinit var dataUsageText: TextView
+    private lateinit var dividerTop: View
+    private lateinit var rootFrame: FrameLayout
+
+    // Tema aktif
+    private var themeIdx = 0
+    private lateinit var cur: ClockTheme
 
     private val handler = Handler(Looper.getMainLooper())
     private val localeId = Locale("in", "ID")
@@ -524,21 +531,15 @@ class MainActivity : Activity() {
     }
 
     private fun setAmPmActive(tv: TextView, active: Boolean) {
-        tv.setTextColor(if (active) Color.BLACK else Color.parseColor("#D8D8D8"))
+        tv.setTextColor(if (active) cur.text else cur.subText)
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        // Layar tetap menyala nonstop selama aplikasi tampil
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        setContentView(R.layout.activity_main)
-        // hideSystemBars() HARUS setelah setContentView: di Android 16,
-        // window.insetsController butuh DecorView yang baru ada setelah ini.
-        // Dipanggil sebelumnya -> NullPointerException (force close).
-        hideSystemBars()
-
+    /**
+     * Ikat semua view dari layout yang sedang aktif + pasang gesture.
+     * Dipanggil tiap ganti layout (ganti tema).
+     */
+    private fun bindViews() {
+        rootFrame = findViewById(R.id.rootFrame)
         hourView = findViewById(R.id.hourView)
         minView = findViewById(R.id.minView)
         secView = findViewById(R.id.secView)
@@ -565,19 +566,37 @@ class MainActivity : Activity() {
         dlSpeed = findViewById(R.id.dlSpeed)
         ulSpeed = findViewById(R.id.ulSpeed)
         dataUsageText = findViewById(R.id.dataUsageText)
+        dividerTop = findViewById(R.id.dividerTop)
 
-        initChime()
-        promptUsageAccessOnce()
-
-        // Tekan lama jam -> buka info aplikasi di Pengaturan
+        // Tekan lama jam -> buka daftar aplikasi di Pengaturan
         clockBox.setOnLongClickListener { openAppSettings(); true }
-        // Ketuk dua kali jam -> buka popup pengaturan suara
+        // Gesture pada jam: ketuk 2x -> pengaturan, swipe kiri/kanan -> ganti tema
         val tapDetector = GestureDetector(
             this,
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDoubleTap(e: MotionEvent): Boolean {
-                    openSoundSettings()
+                    openSettings()
                     return true
+                }
+
+                override fun onFling(
+                    e1: MotionEvent?,
+                    e2: MotionEvent,
+                    velocityX: Float,
+                    velocityY: Float
+                ): Boolean {
+                    val startX = e1?.x ?: return false
+                    val dx = e2.x - startX
+                    val dy = e2.y - (e1.y)
+                    if (kotlin.math.abs(dx) > kotlin.math.abs(dy) &&
+                        kotlin.math.abs(dx) > 120 &&
+                        kotlin.math.abs(velocityX) > 200
+                    ) {
+                        // Swipe kiri -> tema berikutnya, swipe kanan -> sebelumnya
+                        switchTheme(themeIdx + if (dx < 0) 1 else -1)
+                        return true
+                    }
+                    return false
                 }
             }
         )
@@ -587,9 +606,101 @@ class MainActivity : Activity() {
         }
         // Tekan lama suhu -> tampilkan daftar thermal zones (diagnostik)
         tempText.setOnLongClickListener { showThermalZones(); true }
+    }
+
+    /** Terapkan warna tema aktif ke semua view. */
+    private fun applyTheme() {
+        val t = cur
+        rootFrame.setBackgroundColor(t.bg)
+        for (v in listOf(hourView, minView, secView)) {
+            v.segmentOnColor = t.digitOn
+            v.segmentOffColor = t.digitOff
+            v.invalidate()
+        }
+        colonView.setTextColor(t.digitOn)
+        sim1Bars.barOnColor = t.digitOn
+        sim1Bars.barOffColor = t.digitOff
+        sim1Bars.invalidate()
+        sim2Bars.barOnColor = t.digitOn
+        sim2Bars.barOffColor = t.digitOff
+        sim2Bars.invalidate()
+        for (tv in listOf(
+            dlSpeed, ulSpeed, dataUsageText,
+            sim1Label, sim1Dbm, sim1Band, sim2Label, sim2Dbm, sim2Band,
+            dayNameText, dateDayText, dateMonthText, dateYearText
+        )) tv.setTextColor(t.text)
+        netBadge.setTextColor(t.text)
+        tempText.setTextColor(t.text)
+        netBadge.background = themedBadge(t)
+        tempText.background = themedBadge(t)
+        // Kotak tanggal: pakai parent LinearLayout-nya
+        for (tv in listOf(dateDayText, dateMonthText, dateYearText, dayNameText)) {
+            (tv.parent as? View)?.background = themedBox(t)
+        }
+        dividerTop.setBackgroundColor(t.divider)
+        // Segarkan status AM/PM dengan warna tema
+        val isAm = java.util.Calendar.getInstance().get(java.util.Calendar.AM_PM) ==
+            java.util.Calendar.AM
+        setAmPmActive(amText, isAm)
+        setAmPmActive(pmText, !isAm)
+    }
+
+    /** Badge outline (untuk netBadge & tempText) mengikuti warna tema. */
+    private fun themedBadge(t: ClockTheme): android.graphics.drawable.GradientDrawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setColor(t.boxFill)
+            setStroke(2, t.boxStroke)
+            cornerRadius = 8f
+        }
+
+    /** Kotak tanggal mengikuti warna tema. */
+    private fun themedBox(t: ClockTheme): android.graphics.drawable.GradientDrawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            setColor(t.boxFill)
+            setStroke(3, t.boxStroke)
+            cornerRadius = 12f
+        }
+
+    /** Ganti tema: pasang layout baru, bind ulang, terapkan warna. */
+    private fun switchTheme(idx: Int) {
+        themeIdx = (idx + THEMES.size) % THEMES.size
+        cur = THEMES[themeIdx]
+        prefs().edit().putInt("theme_idx", themeIdx).apply()
+        setContentView(cur.layout)
+        bindViews()
+        applyTheme()
+        // hideSystemBars() HARUS setelah setContentView (DecorView baru).
+        hideSystemBars()
+        updateNetBadge()
+        Toast.makeText(this, "Tema: ${cur.name}", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Layar tetap menyala nonstop selama aplikasi tampil
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // Muat tema tersimpan lalu pasang layout-nya
+        themeIdx = prefs().getInt("theme_idx", 0).coerceIn(THEMES.indices)
+        cur = THEMES[themeIdx]
+        setContentView(cur.layout)
+        // hideSystemBars() HARUS setelah setContentView: di Android 16,
+        // window.insetsController butuh DecorView yang baru ada setelah ini.
+        // Dipanggil sebelumnya -> NullPointerException (force close).
+        hideSystemBars()
+        bindViews()
+        applyTheme()
+
+        initChime()
+        promptUsageAccessOnce()
 
         signalMonitor = SignalMonitor(this, ::onSignalUpdate)
         updateNetBadge()
+        // Cek pembaruan aplikasi di GitHub (sekali per versi baru)
+        UpdateManager.checkForUpdate(this, auto = true)
     }
 
     override fun onResume() {
@@ -761,12 +872,13 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Popup pengaturan suara (dibuka dengan ketuk dua kali pada jam):
+     * Popup pengaturan (dibuka dengan ketuk dua kali pada jam):
      * - nada beep lonceng tiap jam (:00), dengan tombol dengar contoh
      * - nada beep tiap setengah jam (:30), dengan tombol dengar contoh
      * - mode pengumuman jam: file suara bawaan / TTS sistem / mati
+     * - versi aplikasi: kelola versi (update / rollback)
      */
-    private fun openSoundSettings() {
+    private fun openSettings() {
         val p = prefs()
         val toneLabels = toneOptions.map { it.second }
         val toneValues = toneOptions.map { it.first }
@@ -853,10 +965,33 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 0)
         })
 
+        // --- Versi aplikasi ---
+        layout.addView(sectionLabel("Versi aplikasi", 32))
+        val installedVer = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (_: Exception) {
+            "?"
+        }
+        val verRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(TextView(this@MainActivity).apply {
+                text = "Terpasang: v$installedVer"
+                layoutParams = LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+            })
+            addView(Button(this@MainActivity).apply {
+                text = "Kelola versi…"
+                setOnClickListener { openVersionList() }
+            })
+        }
+        layout.addView(verRow)
+
         val scroll = ScrollView(this).apply { addView(layout) }
 
         AlertDialog.Builder(this)
-            .setTitle("Pengaturan suara")
+            .setTitle("Pengaturan")
             .setView(scroll)
             .setPositiveButton("Simpan") { _, _ ->
                 p.edit()
@@ -876,6 +1011,9 @@ class MainActivity : Activity() {
             .setNegativeButton("Batal", null)
             .show()
     }
+
+    /** Buka dialog daftar versi (update / rollback). */
+    private fun openVersionList() = UpdateManager.showVersionList(this)
 
     /**
      * Tekan lama jam: buka daftar semua aplikasi di Pengaturan.

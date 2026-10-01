@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="id.my.sir.mpdclock"
-    android:versionCode="21"
-    android:versionName="1.20">
+    android:versionCode="22"
+    android:versionName="2.0">
 
     <!-- Dibutuhkan untuk membaca kekuatan sinyal & info jaringan tiap SIM -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -10,6 +10,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Izin khusus: statistik pemakaian data bulanan (diaktifkan manual di Pengaturan > Akses penggunaan) -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <!-- Untuk cek & download update dari GitHub Releases -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Untuk install APK hasil download (Android 8+) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
@@ -37,5 +41,12 @@
             android:name=".CrashActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <!-- Menyajikan APK hasil download ke installer sistem (pengganti FileProvider) -->
+        <provider
+            android:name=".ApkProvider"
+            android:authorities="id.my.sir.mpdclock.apkprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>
