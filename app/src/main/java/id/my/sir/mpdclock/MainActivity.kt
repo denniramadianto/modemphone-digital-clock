@@ -2,6 +2,10 @@ package id.my.sir.mpdclock
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.AppOpsManager
+import android.app.usage.NetworkStats
+import android.app.usage.NetworkStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -10,12 +14,15 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.net.ConnectivityManager
 import android.net.TrafficStats
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.telephony.TelephonyManager
 import android.view.View
@@ -88,16 +95,144 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Total pemakaian paket data (seluler) dalam GB. */
+    /** Total pemakaian paket data seluler: bulanan (tidak reset saat restart). */
+    private var cachedMonthlyBytes = -1L
+    private var cachedMonthlyAt = 0L
+
     private fun formatDataUsage(): String {
+        val bytes = try {
+            if (hasUsageAccess()) monthlyMobileBytesCached() else -1L
+        } catch (_: Exception) {
+            -1L
+        }.let { if (it >= 0) it else legacyTrafficBytes() }
+        val totalGb = bytes.toDouble() / (1024 * 1024 * 1024)
+        return String.format(localeId, "%.2f GB", totalGb)
+    }
+
+    /** Fallback: TrafficStats (akumulasi sejak boot, reset saat restart). */
+    private fun legacyTrafficBytes(): Long {
         var rx = TrafficStats.getMobileRxBytes()
         var tx = TrafficStats.getMobileTxBytes()
         if (rx == TrafficStats.UNSUPPORTED.toLong()) {
             rx = TrafficStats.getTotalRxBytes()
             tx = TrafficStats.getTotalTxBytes()
         }
-        val totalGb = (rx.coerceAtLeast(0) + tx.coerceAtLeast(0)).toDouble() / (1024 * 1024 * 1024)
-        return String.format(localeId, "%.2f GB", totalGb)
+        return rx.coerceAtLeast(0) + tx.coerceAtLeast(0)
+    }
+
+    /** Cek izin khusus "Akses penggunaan" (Usage Access). */
+    private fun hasUsageAccess(): Boolean {
+        return try {
+            val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = if (Build.VERSION.SDK_INT >= 29) {
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(), packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(), packageName
+                )
+            }
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Total byte seluler dari tanggal 1 bulan berjalan sampai sekarang,
+     * via NetworkStatsManager (data sistem, bertahan setelah restart).
+     * Hasil di-cache 60 detik agar query tidak tiap detik.
+     */
+    private fun monthlyMobileBytesCached(): Long {
+        val now = System.currentTimeMillis()
+        if (cachedMonthlyBytes >= 0 && now - cachedMonthlyAt < 60_000) {
+            return cachedMonthlyBytes
+        }
+        val v = monthlyMobileBytes()
+        cachedMonthlyBytes = v
+        cachedMonthlyAt = now
+        return v
+    }
+
+    private fun monthlyMobileBytes(): Long {
+        return try {
+            val nsm = getSystemService(Context.NETWORK_STATS_SERVICE) as NetworkStatsManager
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val start = cal.timeInMillis
+            val end = System.currentTimeMillis()
+            // querySummaryForDevice berubah tipe kembalian di API 31:
+            // API 23-30 -> NetworkStats (iterasi bucket), API 31+ -> NetworkStats.Bucket.
+            // Dipanggil via reflection agar satu APK aman di semua versi Android.
+            val m = NetworkStatsManager::class.java.getMethod(
+                "querySummaryForDevice",
+                Int::class.javaPrimitiveType, String::class.java,
+                Long::class.javaPrimitiveType, Long::class.javaPrimitiveType
+            )
+            when (val result = m.invoke(nsm, ConnectivityManager.TYPE_MOBILE, null, start, end)) {
+                is NetworkStats.Bucket -> {
+                    (if (result.rxBytes > 0) result.rxBytes else 0L) +
+                        (if (result.txBytes > 0) result.txBytes else 0L)
+                }
+                is NetworkStats -> {
+                    var total = 0L
+                    val bucket = NetworkStats.Bucket()
+                    try {
+                        while (result.hasNextBucket()) {
+                            result.getNextBucket(bucket)
+                            if (bucket.rxBytes > 0) total += bucket.rxBytes
+                            if (bucket.txBytes > 0) total += bucket.txBytes
+                        }
+                    } finally {
+                        try {
+                            result.close()
+                        } catch (_: Exception) {
+                        }
+                    }
+                    total
+                }
+                else -> -1L
+            }
+        } catch (_: Exception) {
+            -1L
+        }
+    }
+
+    /**
+     * Minta izin "Akses penggunaan" sekali saja per instalasi.
+     * Tanpa izin ini, angka Data memakai TrafficStats (reset tiap restart).
+     */
+    private fun promptUsageAccessOnce() {
+        if (hasUsageAccess()) return
+        val prefs = getSharedPreferences("mpdclock", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("usage_prompted", false)) return
+        prefs.edit().putBoolean("usage_prompted", true).apply()
+        try {
+            AlertDialog.Builder(this)
+                .setTitle("Akses penggunaan")
+                .setMessage(
+                    "Agar angka \"Data\" menampilkan pemakaian bulan berjalan " +
+                        "dan tidak kembali ke 0 setiap HP direstart, aktifkan " +
+                        "\"Akses penggunaan\" untuk ModemPhone Digital Clock di layar berikutnya."
+                )
+                .setPositiveButton("Buka Pengaturan") { _, _ ->
+                    try {
+                        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    } catch (_: Exception) {
+                    }
+                }
+                .setNegativeButton("Nanti", null)
+                .show()
+        } catch (_: Exception) {
+        }
     }
 
     // ---------- Lonceng jam (beep + suara) ----------
@@ -315,6 +450,7 @@ class MainActivity : Activity() {
         dataUsageText = findViewById(R.id.dataUsageText)
 
         initChime()
+        promptUsageAccessOnce()
 
         signalMonitor = SignalMonitor(this, ::onSignalUpdate)
         updateNetBadge()
