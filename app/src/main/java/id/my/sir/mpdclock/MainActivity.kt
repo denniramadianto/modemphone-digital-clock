@@ -14,7 +14,6 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.net.ConnectivityManager
 import android.net.TrafficStats
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -690,16 +689,19 @@ class MainActivity : Activity() {
         return if (s.level in 0..4) (s.level * 6) / 4 else -1
     }
 
-    /** Tekan lama jam: buka halaman info aplikasi di Pengaturan. */
+    /**
+     * Tekan lama jam: buka daftar semua aplikasi di Pengaturan.
+     * Ini jalan pintas membuka aplikasi lain karena aplikasi ini menjadi
+     * launcher/Home sehingga tidak ada laci aplikasi.
+     */
     private fun openAppSettings() {
         try {
-            startActivity(
-                Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.fromParts("package", packageName, null)
-                )
-            )
+            startActivity(Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS))
         } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_SETTINGS))
+            } catch (_: Exception) {
+            }
         }
     }
 
