@@ -47,11 +47,33 @@ Tampilan: background putih, digit hitam, fullscreen imersif, layar selalu menyal
 
 ### 🔔 Lonceng tiap jam
 - Tepat `HH:00` → bunyi *beep* sejumlah jam (format 12 jam), lalu suara
-  **"Sekarang pukul N"** (TTS Bahasa Indonesia).
+  **"Sekarang pukul N"** (file suara bawaan / TTS / mati — bisa dipilih).
 - Tepat `HH:30` → satu bunyi *beep*.
-- Nada: `TONE_CDMA_HIGH_L` 650 ms, interval 950 ms, volume penuh via
-  stream **ALARM** (tetap bunyi walau media di-mute). Saat aplikasi dibuka,
-  ketersediaan data suara TTS dicek otomatis.
+- Nada `:00` dan `:30` bisa dipilih sendiri (8 nada) + tombol **Dengar** contoh.
+- **Ketuk 2× jam** → popup **Pengaturan** (suara + kelola versi aplikasi).
+
+### 🎨 Tema (7 pilihan, swipe kiri/kanan pada jam)
+| Tema | Layout | Warna |
+|---|---|---|
+| Siang Klasik | Klasik | Putih, digit hitam |
+| Malam Hijau | Penuh (jam raksasa) | Hitam, digit hijau LED |
+| Alarm Merah | Klasik | Hitam, digit merah |
+| Senja Amber | Klasik | Hitam, digit amber VFD |
+| Samudra | Samping (info di kanan) | Navy, digit cyan |
+| Kertas Vintage | Klasik | Krem, digit cokelat |
+| Smartwatch | Watch face + complications | Hitam, digit putih |
+
+- Semua fitur tetap sama di semua tema — hanya tampilan yang berubah.
+- Pilihan tema tersimpan walau HP restart.
+
+### 🔄 Update & kelola versi (tanpa download manual)
+- Tiap dibuka, aplikasi cek GitHub Releases; kalau ada versi baru muncul
+  tawaran **Update** → download → install (satu tap di dialog sistem).
+- **Ketuk 2× jam → Pengaturan → Kelola versi…**: daftar semua versi yang
+  pernah rilis, bisa install versi mana pun.
+- **Rollback**: di HP root downgrade berjalan diam-diam; di HP non-root APK
+  disalin ke folder Download lalu dipandu uninstall + install ulang
+  (pengaturan kembali default — keterbatasan Android, bukan bug).
 
 ### 🏠 Mode launcher & jalan pintas
 - Terdaftar sebagai **aplikasi Home/Launcher** — tiap HP dinyalakan langsung
@@ -109,6 +131,8 @@ penggunaan* (sekali saja) → jalankan semua monitor di atas.
 | `READ_PHONE_STATE` | Membaca kekuatan sinyal & info jaringan tiap SIM |
 | `ACCESS_FINE_LOCATION` | Syarat Android untuk membaca info sel (band) |
 | `PACKAGE_USAGE_STATS` | Membaca pemakaian data bulanan (*Akses penggunaan*, via Pengaturan) |
+| `INTERNET` | Cek & download update dari GitHub Releases |
+| `REQUEST_INSTALL_PACKAGES` | Install APK hasil download (Android 8+) |
 
 Tanpa izin telepon/lokasi, info sinyal tampil `-` — jam & trafik tetap jalan.
 
@@ -142,6 +166,9 @@ keytool -genkeypair -keystore release.keystore -alias appkey \
    bila ingin angka Data bulanan akurat.
 4. (Opsional) Jadikan aplikasi Home/Launcher default agar tiap HP dinyalakan
    langsung masuk ke jam.
+
+Mulai v2.0 update berikutnya tidak perlu manual: aplikasi menawarkan update
+sendiri, atau via ketuk 2× jam → Pengaturan → **Kelola versi…**.
 
 ## 🧩 Struktur proyek
 
