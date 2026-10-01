@@ -43,3 +43,19 @@ APK debug akan ada di `app/build/outputs/apk/debug/app-debug.apk`.
 - Trafik: `TrafficStats.getMobileRxBytes()/getMobileTxBytes()` per detik
   (fallback ke total bila perangkat tidak mendukung pemisahan trafik seluler).
 - `minSdk 26` (Android 8.0), `targetSdk 34`.
+
+## Build sendiri
+
+Build dilakukan tanpa Gradle via `build-apk.sh` (pipeline aapt2 → kotlinc → d8 →
+zipalign → apksigner). Signing memakai `release.keystore` yang **tidak ikut**
+repo ini — buat keystore sendiri bila ingin build APK signed:
+
+```bash
+keytool -genkeypair -keystore release.keystore -alias appkey \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+## Lisensi
+
+Proyek ini dirilis di bawah [MIT License](LICENSE). Font DSEG seven-segment
+berlisensi SIL Open Font License (lihat `DSEG-LICENSE.txt`).
