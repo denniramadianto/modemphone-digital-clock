@@ -1,4 +1,4 @@
-package com.denni.jamdigital
+package id.my.sir.mpdclock
 
 import android.annotation.SuppressLint
 import android.content.Context

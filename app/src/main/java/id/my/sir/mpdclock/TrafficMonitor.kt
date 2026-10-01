@@ -1,4 +1,4 @@
-package com.denni.jamdigital
+package id.my.sir.mpdclock
 
 import android.net.TrafficStats
 import android.os.Handler

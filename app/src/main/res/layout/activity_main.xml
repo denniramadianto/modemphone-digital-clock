@@ -228,7 +228,7 @@
                 android:gravity="center_horizontal"
                 android:orientation="vertical">
 
-                <com.denni.jamdigital.SegmentDisplayView
+                <id.my.sir.mpdclock.SegmentDisplayView
                     android:id="@+id/hourView"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
@@ -262,7 +262,7 @@
                 android:gravity="center_horizontal"
                 android:orientation="vertical">
 
-                <com.denni.jamdigital.SegmentDisplayView
+                <id.my.sir.mpdclock.SegmentDisplayView
                     android:id="@+id/minView"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
@@ -279,7 +279,7 @@
                 android:gravity="center_horizontal"
                 android:orientation="vertical">
 
-                <com.denni.jamdigital.SegmentDisplayView
+                <id.my.sir.mpdclock.SegmentDisplayView
                     android:id="@+id/secView"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
@@ -340,7 +340,7 @@
                     android:textSize="10sp"
                     android:textStyle="bold" />
 
-                <com.denni.jamdigital.SignalBarsView
+                <id.my.sir.mpdclock.SignalBarsView
                     android:id="@+id/sim1Bars"
                     android:layout_width="64dp"
                     android:layout_height="14dp"
@@ -394,7 +394,7 @@
                     android:textSize="10sp"
                     android:textStyle="bold" />
 
-                <com.denni.jamdigital.SignalBarsView
+                <id.my.sir.mpdclock.SignalBarsView
                     android:id="@+id/sim2Bars"
                     android:layout_width="64dp"
                     android:layout_height="14dp"
