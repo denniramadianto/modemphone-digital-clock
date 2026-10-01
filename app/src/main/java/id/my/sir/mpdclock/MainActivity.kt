@@ -6,17 +6,14 @@ import android.app.AlertDialog
 import android.app.AppOpsManager
 import android.app.usage.NetworkStats
 import android.app.usage.NetworkStatsManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.net.ConnectivityManager
 import android.net.TrafficStats
-import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -84,14 +81,74 @@ class MainActivity : Activity() {
         dataUsageText.text = "Data ${formatDataUsage()}"
     }
 
-    // Suhu baterai (indikator suhu mesin yang bisa diakses aplikasi biasa)
-    private val batteryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val t = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
-                ?: return
-            if (t != Int.MIN_VALUE) {
-                tempText.text = String.format(localeId, "%.1f°C", t / 10f)
+    // Suhu CPU dari thermal zone (/sys/class/thermal). Perangkat ini tanpa baterai
+    // (bypass stepdown) + root Magisk, jadi suhu baterai tidak bermakna.
+    // Dibaca tiap 5 detik di thread latar; coba baca langsung, fallback via su.
+    private var thermalUseSu: Boolean? = null
+
+    private val cpuTempTask = object : Runnable {
+        override fun run() {
+            Thread {
+                val t = readCpuTemp()
+                handler.post {
+                    tempText.text = if (t != null) {
+                        String.format(localeId, "%.1f°C", t)
+                    } else {
+                        "--°C"
+                    }
+                }
+            }.start()
+            handler.postDelayed(this, 5000)
+        }
+    }
+
+    private fun readCpuTemp(): Double? {
+        return try {
+            val zones = java.io.File("/sys/class/thermal")
+                .listFiles { f -> f.name.startsWith("thermal_zone") }
+                ?: return null
+            if (zones.isEmpty()) return null
+            if (thermalUseSu == null) {
+                thermalUseSu = try {
+                    java.io.File(zones[0], "temp").readText()
+                    false
+                } catch (_: Exception) {
+                    true
+                }
             }
+            var cpuBest: Double? = null
+            var otherBest: Double? = null
+            for (zone in zones) {
+                val type = readThermalFile(java.io.File(zone, "type"))
+                    ?.trim()?.lowercase() ?: continue
+                val raw = readThermalFile(java.io.File(zone, "temp"))
+                    ?.trim()?.toLongOrNull() ?: continue
+                if (raw <= 0 || raw > 200_000) continue
+                val c = raw / 1000.0
+                if ("cpu" in type) {
+                    if (cpuBest == null || c > cpuBest) cpuBest = c
+                } else if ("battery" !in type) {
+                    if (otherBest == null || c > otherBest) otherBest = c
+                }
+            }
+            cpuBest ?: otherBest
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun readThermalFile(f: java.io.File): String? {
+        return try {
+            if (thermalUseSu == true) {
+                val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "cat ${f.absolutePath}"))
+                val out = p.inputStream.bufferedReader().readText()
+                p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+                out.ifBlank { null }
+            } else {
+                f.readText()
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -459,8 +516,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         handler.post(tick)
+        handler.post(cpuTempTask)
         trafficMonitor.start()
-        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         ensurePhonePermission()
         // Terapkan ulang tiap kembali: sistem/MIUI sering menghapus flag
         // fullscreen saat fokus berpindah (dialog, Toast, dsb).
@@ -475,13 +532,9 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(cpuTempTask)
         trafficMonitor.stop()
         signalMonitor.stop()
-        try {
-            unregisterReceiver(batteryReceiver)
-        } catch (_: IllegalArgumentException) {
-            // receiver tidak terdaftar, abaikan
-        }
     }
 
     override fun onDestroy() {
