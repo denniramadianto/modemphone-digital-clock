@@ -326,6 +326,14 @@ class MainActivity : Activity() {
         trafficMonitor.start()
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         ensurePhonePermission()
+        // Terapkan ulang tiap kembali: sistem/MIUI sering menghapus flag
+        // fullscreen saat fokus berpindah (dialog, Toast, dsb).
+        hideSystemBars()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
     }
 
     override fun onPause() {
