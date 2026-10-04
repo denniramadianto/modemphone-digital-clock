@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <!-- Untuk cek & download update dari GitHub Releases -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Untuk cek status jaringan sebelum uji koneksi internet (badge hijau/merah) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Untuk install APK hasil download (Android 8+) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -19,6 +21,8 @@
     <application
         android:name=".CrashApplication"
         android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.JamDigital"
         android:supportsRtl="true">
 

@@ -26,7 +26,10 @@ Tampilan: background putih, digit hitam, fullscreen imersif, layar selalu menyal
 - Dibaca per slot SIM via `TelephonyManager` (`TelephonyCallback` di API 31+,
   `PhoneStateListener` di bawahnya) — pemetaan berdasarkan **nomor slot**, jadi
   tetap benar walau yang aktif hanya slot SIM 2.
-- **Badge generasi jaringan** (4G/5G) mengikuti SIM yang terdeteksi jaringannya.
+- **Badge generasi jaringan dinamis**: label mengikuti tipe jaringan asli
+  (5G/4G/3G/2G), tampil **"X"** kalau tidak ada sinyal sama sekali, berwarna
+  **hijau** jika internet benar-benar tembus (cek HTTP `generate_204` tiap
+  10 detik) dan **merah** jika tidak.
 
 ### 📊 Trafik & pemakaian data
 - Kecepatan **download (↓)** dan **upload (↑)** dihitung tiap 1 detik dari
@@ -133,6 +136,7 @@ penggunaan* (sekali saja) → jalankan semua monitor di atas.
 | `ACCESS_FINE_LOCATION` | Syarat Android untuk membaca info sel (band) |
 | `PACKAGE_USAGE_STATS` | Membaca pemakaian data bulanan (*Akses penggunaan*, via Pengaturan) |
 | `INTERNET` | Cek & download update dari GitHub Releases |
+| `ACCESS_NETWORK_STATE` | Cek status jaringan sebelum uji koneksi internet (badge hijau/merah) |
 | `REQUEST_INSTALL_PACKAGES` | Install APK hasil download (Android 8+) |
 
 Tanpa izin telepon/lokasi, info sinyal tampil `-` — jam & trafik tetap jalan.

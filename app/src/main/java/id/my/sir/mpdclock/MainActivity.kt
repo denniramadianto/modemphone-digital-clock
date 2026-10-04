@@ -84,6 +84,13 @@ class MainActivity : Activity() {
     private var lastDayKey = ""
     private var lastChimeKey = ""
 
+    // Status badge jaringan: sinyal aktual & koneksi internet nyata.
+    // Diperbarui oleh onSignalUpdate (tiap ada perubahan sinyal) dan
+    // netCheckTask (cek HTTP generate_204 tiap 10 detik di thread latar).
+    @Volatile private var netHasSignal = false
+    @Volatile private var netGen: String? = null   // "5G"/"4G"/"3G"/"2G" terakhir yang terdeteksi
+    @Volatile private var internetOk = false
+
     private var tts: TextToSpeech? = null
     private var toneGen: ToneGenerator? = null
 
@@ -634,6 +641,8 @@ class MainActivity : Activity() {
         tempText.setTextColor(t.text)
         netBadge.background = themedBadge(t)
         tempText.background = themedBadge(t)
+        // Terapkan ulang status badge (hijau/merah/X) di atas styling tema
+        refreshNetBadge()
         // Kotak tanggal: satu frame full-width (hanya ada di layout Klasik)
         (findViewById<View>(R.id.dateBox))?.let { box ->
             box.background = themedBox(t)
@@ -679,7 +688,6 @@ class MainActivity : Activity() {
         applyTheme()
         // hideSystemBars() HARUS setelah setContentView (DecorView baru).
         hideSystemBars()
-        updateNetBadge()
         Toast.makeText(this, "Tema: ${cur.name}", Toast.LENGTH_SHORT).show()
     }
 
@@ -704,7 +712,6 @@ class MainActivity : Activity() {
         promptUsageAccessOnce()
 
         signalMonitor = SignalMonitor(this, ::onSignalUpdate)
-        updateNetBadge()
         // Cek pembaruan aplikasi di GitHub (sekali per versi baru)
         UpdateManager.checkForUpdate(this, auto = true)
     }
@@ -715,6 +722,9 @@ class MainActivity : Activity() {
         handler.post(cpuTempTask)
         trafficMonitor.start()
         ensurePhonePermission()
+        // Cek koneksi internet nyata tiap 10 detik (badge hijau/merah)
+        handler.removeCallbacks(netCheckTask)
+        handler.post(netCheckTask)
         // Terapkan ulang tiap kembali: sistem/MIUI sering menghapus flag
         // fullscreen saat fokus berpindah (dialog, Toast, dsb).
         hideSystemBars()
@@ -729,6 +739,7 @@ class MainActivity : Activity() {
         super.onPause()
         handler.removeCallbacks(tick)
         handler.removeCallbacks(cpuTempTask)
+        handler.removeCallbacks(netCheckTask)
         trafficMonitor.stop()
         signalMonitor.stop()
     }
@@ -837,21 +848,62 @@ class MainActivity : Activity() {
             sim2Band.text = "Band -"
         }
 
-        // badge memakai generasi jaringan dari SIM pertama yang terdeteksi jaringannya
-        val gen = listOfNotNull(s1, s2).firstOrNull { it.netGen != "-" }?.netGen
-        if (gen != null) netBadge.text = gen
+        // Badge dinamis: ada sinyal = level/dBm/tipe jaringan/band terbaca
+        // di salah satu SIM; label memakai generasi jaringan dari SIM
+        // pertama yang terdeteksi tipenya (5G/4G/3G/2G asli).
+        val sims = listOfNotNull(s1, s2)
+        netHasSignal = sims.any {
+            it.level >= 0 || it.dbm != Int.MIN_VALUE || it.netGen != "-" || it.band != "-"
+        }
+        sims.firstOrNull { it.netGen != "-" }?.netGen?.let { netGen = it }
+        refreshNetBadge()
     }
 
-    private fun updateNetBadge() {
-        try {
-            val tm = getSystemService(TelephonyManager::class.java)
-            netBadge.text = when (tm.dataNetworkType) {
-                TelephonyManager.NETWORK_TYPE_NR -> "5G"
-                TelephonyManager.NETWORK_TYPE_LTE -> "4G"
-                else -> "4G"
-            }
+    /**
+     * Badge jaringan dinamis, dipanggil dari onSignalUpdate dan netCheckTask:
+     * - tidak ada sinyal sama sekali -> "X" merah
+     * - ada sinyal + internet tembus -> label tipe asli (5G/4G/3G/2G), hijau
+     * - ada sinyal tapi internet tidak tembus -> label tipe asli, merah
+     */
+    private fun refreshNetBadge() {
+        if (!::netBadge.isInitialized) return
+        netBadge.text = if (netHasSignal) (netGen ?: "-") else "X"
+        val connected = netHasSignal && internetOk
+        val fill = if (connected) 0xFF2E7D32.toInt() else 0xFFC62828.toInt()
+        (netBadge.background as? android.graphics.drawable.GradientDrawable)?.setColor(fill)
+        netBadge.setTextColor(android.graphics.Color.WHITE)
+    }
+
+    /**
+     * Uji koneksi internet nyata: HTTP ke generate_204 (cara standar Android
+     * memastikan internet benar-benar tembus, bukan sekadar "ada jaringan").
+     * Dijalankan di thread latar oleh netCheckTask tiap 10 detik.
+     */
+    private fun checkInternetReachable(): Boolean {
+        return try {
+            val cm = getSystemService(ConnectivityManager::class.java)
+            if (cm.activeNetwork == null) return false
+            val conn = java.net.URL("https://www.google.com/generate_204")
+                .openConnection() as javax.net.ssl.HttpsURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.instanceFollowRedirects = false
+            conn.useCaches = false
+            val code = conn.responseCode
+            conn.disconnect()
+            code == 204 || code == 200
         } catch (e: Exception) {
-            netBadge.text = "4G"
+            false
+        }
+    }
+
+    private val netCheckTask = object : Runnable {
+        override fun run() {
+            Thread {
+                internetOk = checkInternetReachable()
+                handler.post { refreshNetBadge() }
+            }.apply { isDaemon = true }.start()
+            handler.postDelayed(this, 10_000)
         }
     }
 
