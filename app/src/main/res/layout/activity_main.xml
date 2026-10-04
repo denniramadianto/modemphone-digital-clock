@@ -372,105 +372,74 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Bar bawah: tanggal & hari, rata tengah -->
+        <!-- Bar bawah: tanggal dalam 1 frame full-width, rata tengah -->
         <LinearLayout
+            android:id="@+id/dateBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
+            android:background="@drawable/box_outline"
             android:gravity="center"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:padding="10dp">
 
-            <LinearLayout
-                android:layout_width="84dp"
+            <TextView
+                android:id="@+id/dayNameText"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_margin="4dp"
-                android:background="@drawable/box_outline"
-                android:gravity="center_horizontal"
+                android:text="MINGGU"
+                android:textColor="@android:color/black"
+                android:textSize="20sp"
+                android:textStyle="bold" />
 
-                android:orientation="vertical"
-                android:padding="7dp">
-
-                <TextView
-                    android:id="@+id/dayNameText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:text="KAMIS"
-                    android:textColor="@android:color/black"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                    
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="84dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_margin="4dp"
-                android:background="@drawable/box_outline"
-                android:gravity="center_horizontal"
+                android:layout_marginHorizontal="10dp"
+                android:text="•"
+                android:textColor="@android:color/black"
+                android:textSize="18sp" />
 
-                android:orientation="vertical"
-                android:padding="7dp">
-
-                <TextView
-                    android:id="@+id/dateDayText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/dseg7classic_regular"
-                    android:gravity="center"
-                    android:text="01"
-                    android:textColor="@android:color/black"
-                    android:textSize="18sp" />
-
-                    
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="84dp"
+            <TextView
+                android:id="@+id/dateDayText"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_margin="4dp"
-                android:background="@drawable/box_outline"
-                android:gravity="center_horizontal"
+                android:fontFamily="@font/dseg7classic_regular"
+                android:text="04"
+                android:textColor="@android:color/black"
+                android:textSize="18sp" />
 
-                android:orientation="vertical"
-                android:padding="7dp">
-
-                <TextView
-                    android:id="@+id/dateMonthText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/dseg7classic_regular"
-                    android:gravity="center"
-                    android:text="10"
-                    android:textColor="@android:color/black"
-                    android:textSize="18sp" />
-
-                    
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="84dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_margin="4dp"
-                android:background="@drawable/box_outline"
-                android:gravity="center_horizontal"
+                android:text="-"
+                android:textColor="@android:color/black"
+                android:textSize="18sp" />
 
-                android:orientation="vertical"
-                android:padding="7dp">
+            <TextView
+                android:id="@+id/dateMonthText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/dseg7classic_regular"
+                android:text="10"
+                android:textColor="@android:color/black"
+                android:textSize="18sp" />
 
-                <TextView
-                    android:id="@+id/dateYearText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/dseg7classic_regular"
-                    android:gravity="center"
-                    android:text="2026"
-                    android:textColor="@android:color/black"
-                    android:textSize="18sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textColor="@android:color/black"
+                android:textSize="18sp" />
 
-                    
-            </LinearLayout>
+            <TextView
+                android:id="@+id/dateYearText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/dseg7classic_regular"
+                android:text="2026"
+                android:textColor="@android:color/black"
+                android:textSize="18sp" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

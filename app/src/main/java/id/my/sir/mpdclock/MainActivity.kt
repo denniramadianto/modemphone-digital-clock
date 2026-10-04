@@ -27,6 +27,7 @@ import android.telephony.TelephonyManager
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -633,9 +634,14 @@ class MainActivity : Activity() {
         tempText.setTextColor(t.text)
         netBadge.background = themedBadge(t)
         tempText.background = themedBadge(t)
-        // Kotak tanggal: pakai parent LinearLayout-nya
-        for (tv in listOf(dateDayText, dateMonthText, dateYearText, dayNameText)) {
-            (tv.parent as? View)?.background = themedBox(t)
+        // Kotak tanggal: satu frame full-width (hanya ada di layout Klasik)
+        (findViewById<View>(R.id.dateBox))?.let { box ->
+            box.background = themedBox(t)
+            (box as? ViewGroup)?.let { vg ->
+                for (i in 0 until vg.childCount) {
+                    (vg.getChildAt(i) as? TextView)?.setTextColor(t.text)
+                }
+            }
         }
         dividerTop.setBackgroundColor(t.divider)
         // Segarkan status AM/PM dengan warna tema
