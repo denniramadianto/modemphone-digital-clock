@@ -33,6 +33,7 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
@@ -99,6 +100,13 @@ class MainActivity : Activity() {
     )
 
     private lateinit var signalMonitor: SignalMonitor
+    private lateinit var ntpSync: NtpSync
+    // Sinkron jam NTP otomatis (butuh root): hasil terakhir + view status
+    // di dialog Pengaturan (null saat dialog tidak terbuka).
+    private var ntpStatusView: TextView? = null
+    private var lastNtpResult: NtpSync.Result? = null
+    private var lastNtpAt: Long = 0L
+    private var ntpSessionArmed = false
     private val trafficMonitor = TrafficMonitor { rx, tx ->
         dlSpeed.text = "↓ ${formatSpeed(rx, localeId)}"
         ulSpeed.text = "↑ ${formatSpeed(tx, localeId)}"
@@ -712,6 +720,7 @@ class MainActivity : Activity() {
         promptUsageAccessOnce()
 
         signalMonitor = SignalMonitor(this, ::onSignalUpdate)
+        ntpSync = NtpSync(this)
         // Cek pembaruan aplikasi di GitHub (sekali per versi baru)
         UpdateManager.checkForUpdate(this, auto = true)
     }
@@ -725,6 +734,8 @@ class MainActivity : Activity() {
         // Cek koneksi internet nyata tiap 10 detik (badge hijau/merah)
         handler.removeCallbacks(netCheckTask)
         handler.post(netCheckTask)
+        // Sinkron jam NTP otomatis (butuh root)
+        refreshNtpSync()
         // Terapkan ulang tiap kembali: sistem/MIUI sering menghapus flag
         // fullscreen saat fokus berpindah (dialog, Toast, dsb).
         hideSystemBars()
@@ -740,6 +751,7 @@ class MainActivity : Activity() {
         handler.removeCallbacks(tick)
         handler.removeCallbacks(cpuTempTask)
         handler.removeCallbacks(netCheckTask)
+        ntpSync.stopPeriodic()
         trafficMonitor.stop()
         signalMonitor.stop()
     }
@@ -907,6 +919,53 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Terapkan preferensi sinkron NTP: nyalakan scheduler + matikan waktu
+     * otomatis bawaan (agar NITZ jelek tidak menimpa), atau sebaliknya.
+     */
+    private fun refreshNtpSync() {
+        if (!::ntpSync.isInitialized) return
+        val on = prefs().getBoolean("ntp_sync", true)
+        if (on) {
+            ntpSync.startPeriodic(30 * 60 * 1000L) { r ->
+                recordNtpResult(r)
+                ntpStatusView?.text = lastNtpText()
+            }
+            if (!ntpSessionArmed) {
+                ntpSessionArmed = true
+                Thread {
+                    if (ntpSync.checkRoot()) ntpSync.setAutoTimeEnabled(false)
+                    handler.post { ntpStatusView?.text = lastNtpText() }
+                }.apply { isDaemon = true }.start()
+            }
+        } else {
+            ntpSync.stopPeriodic()
+            ntpSessionArmed = false
+            Thread {
+                if (ntpSync.checkRoot()) ntpSync.setAutoTimeEnabled(true)
+            }.apply { isDaemon = true }.start()
+        }
+    }
+
+    private fun recordNtpResult(r: NtpSync.Result) {
+        lastNtpResult = r
+        lastNtpAt = System.currentTimeMillis()
+    }
+
+    private fun lastNtpText(): String {
+        val r = lastNtpResult ?: run {
+            val rootState = ntpSync.hasRoot
+            return when (rootState) {
+                true -> "Root OK. Menunggu sinkron pertama…"
+                false -> "Root tidak tersedia: sinkron jam tidak bisa jalan."
+                null -> "Memeriksa root…"
+            }
+        }
+        val waktu = java.text.SimpleDateFormat("HH:mm", localeId)
+            .format(java.util.Date(lastNtpAt))
+        return "Terakhir $waktu: ${r.detail}"
+    }
+
     private fun formatDbm(dbm: Int): String =
         if (dbm == Int.MIN_VALUE) "-" else "$dbm dBm"
 
@@ -1023,6 +1082,46 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 0)
         })
 
+        // --- Sinkron jam NTP otomatis (butuh root) ---
+        layout.addView(sectionLabel("Sinkron jam NTP (butuh root)", 32))
+        val cbNtp = CheckBox(this).apply {
+            text = "Aktif — sinkron tiap 30 menit"
+            isChecked = p.getBoolean("ntp_sync", true)
+        }
+        layout.addView(cbNtp)
+        val ntpStatus = TextView(this).apply {
+            text = lastNtpText()
+            setPadding(0, 8, 0, 0)
+        }
+        ntpStatusView = ntpStatus
+        layout.addView(ntpStatus)
+        layout.addView(Button(this).apply {
+            text = "Sinkronkan sekarang"
+            setOnClickListener {
+                text = "Menyinkron…"
+                isEnabled = false
+                Thread {
+                    val r = try {
+                        ntpSync.syncNow()
+                    } catch (e: Exception) {
+                        NtpSync.Result(false, "Error: ${e.message}", 0)
+                    }
+                    handler.post {
+                        recordNtpResult(r)
+                        ntpStatus.text = lastNtpText()
+                        text = "Sinkronkan sekarang"
+                        isEnabled = true
+                    }
+                }.apply { isDaemon = true }.start()
+            }
+        })
+        layout.addView(TextView(this).apply {
+            text = "Mengambil jam akurat dari internet lalu mengatur jam " +
+                "sistem via root. Waktu 'otomatis' bawaan Android dimatikan " +
+                "agar waktu NITZ operator yang meleset tidak menimpa lagi."
+            setPadding(0, 8, 0, 0)
+        })
+
         // --- Versi aplikasi ---
         layout.addView(sectionLabel("Versi aplikasi", 32))
         val installedVer = try {
@@ -1063,10 +1162,13 @@ class MainActivity : Activity() {
                             else -> "file"
                         }
                     )
+                    .putBoolean("ntp_sync", cbNtp.isChecked)
                     .apply()
-                Toast.makeText(this, "Pengaturan suara disimpan", Toast.LENGTH_SHORT).show()
+                ntpStatusView = null
+                refreshNtpSync()
+                Toast.makeText(this, "Pengaturan disimpan", Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Batal", null)
+            .setNegativeButton("Batal") { _, _ -> ntpStatusView = null }
             .show()
     }
 

@@ -53,7 +53,16 @@ Tampilan: background putih, digit hitam, fullscreen imersif, layar selalu menyal
   **"Sekarang pukul N"** (file suara bawaan / TTS / mati — bisa dipilih).
 - Tepat `HH:30` → satu bunyi *beep*.
 - Nada `:00` dan `:30` bisa dipilih sendiri (8 nada) + tombol **Dengar** contoh.
-- **Ketuk 2× jam** → popup **Pengaturan** (suara + kelola versi aplikasi).
+- **Ketuk 2× jam** → popup **Pengaturan** (suara + sinkron NTP + kelola versi aplikasi).
+
+### 🛰️ Sinkron jam NTP otomatis (butuh root)
+- Mengambil jam akurat dari internet (SNTP, `time.google.com`) **tiap 30 menit**,
+  lalu mengatur jam sistem via `su` bila selisih > 30 detik.
+- Mematikan **waktu otomatis** bawaan Android agar waktu NITZ operator yang
+  meleset tidak menimpa hasil koreksi (dikembalikan saat fitur dimatikan).
+- Status sinkron terakhir + tombol **Sinkronkan sekarang** ada di popup
+  Pengaturan (ketuk 2× jam). Dibuat untuk HP yang jamnya sering meleset
+  beberapa menit (NITZ operator tidak akurat + tanpa baterai).
 
 ### 🎨 Tema (8 pilihan, swipe kiri/kanan pada jam)
 | Tema | Layout | Warna |
